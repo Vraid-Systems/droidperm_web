@@ -1,12 +1,13 @@
 <?php
 
-if (!defined('BASEPATH'))
+if (!defined('BASEPATH')) {
     exit('No direct script access allowed');
+}
 
 /**
  * slightly refactored by Jason Zerbe <jzerbe@vraidsys.com> for use as
  * a CodeIgniter library
- * 
+ *
  * @author Niklas Nilsson <splitfeed@gmail.com>
  * @see https://github.com/splitfeed/android-market-api-php/blob/master/Market/MarketSession.php
  */
