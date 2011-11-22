@@ -4,7 +4,7 @@
  * @author Jason Zerbe <jzerbe@vraidsys.com>
  * @see https://github.com/jzerbe/droidperm_web
  * modifications to constructor to get latest application data
- * 
+ *
  * @author Niklas Nilsson <splitfeed@gmail.com>
  * @see https://github.com/splitfeed/android-market-api-php
  */
@@ -88,7 +88,7 @@ class MarketSession {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        @curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
 
 

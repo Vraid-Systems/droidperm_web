@@ -1,18 +1,38 @@
 <?php
-
 # get the package we are going to be searching for
-$myPackageNameSearch = '';
+$myPackageNameSearch = false;
 if (isset($_GET['package']) && ($_GET['package'] != '')) {
     $myPackageNameSearch = $_GET['package'];
-}
-if ($myPackageNameSearch == '') {
-    die('package arg is empty');
 }
 
 # exact string matching or match all strings that have package substring
 $myExactMatchBoolean = false;
 if (isset($_GET['exact']) && ($_GET['exact'] != '')) {
     $myExactMatchBoolean = $_GET['exact'];
+}
+
+#get command line args if they exist
+while(count($argv) > 0) {
+	$arg = array_shift($argv);
+	switch($arg) {
+		case '-package':
+			$arg_package  = array_shift($argv);
+			if (empty($myPackageNameSearch)) {
+				$myPackageNameSearch = $arg_package;
+			}
+			break;
+		case '-exact':
+			$arg_exact  = array_shift($argv);
+			if (empty($myExactMatchBoolean)) {
+				$myExactMatchBoolean = $arg_exact;
+			}
+			break;
+	}
+}
+
+#check to make sure we have the params we need
+if ($myPackageNameSearch == '') {
+    die('package arg is empty');
 }
 if (!empty($myExactMatchBoolean)) {
     $myExactMatchBoolean = true;
@@ -31,7 +51,7 @@ $session->setAndroidId(ANDROID_DEVICEID);
 
 # create market search request
 $ar = new AppsRequest();
-$ar->setQuery($thePackageName);
+$ar->setQuery($myPackageNameSearch);
 $ar->setOrderType(AppsRequest_OrderType::NONE);
 $ar->setStartIndex(0);
 $ar->setEntriesCount(5);
@@ -53,12 +73,12 @@ foreach ($groups as $rg) {
     $apps = $appsResponse->getAppArray();
     foreach ($apps as $app) {
         $aPackageName = $app->getPackageName();
-        if ($theExactMatchBoolean) {
+        if ($myExactMatchBoolean) {
             //check if this packagename is substring of search package name
-            $pos = strpos($thePackageName, $aPackageName);
+            $pos = strpos($myPackageNameSearch, $aPackageName);
         } else {
             //check if search package name is substring of this package name
-            $pos = strpos($aPackageName, $thePackageName);
+            $pos = strpos($aPackageName, $myPackageNameSearch);
         }
         if ($pos !== false) { //if there is a match ...
             $packages[$i]['package_name'] = $aPackageName;
@@ -93,4 +113,3 @@ for ($i = 0; $i < $packages_count; $i++) {
     echo "\n";
 }
 ?>
-  
