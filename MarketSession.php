@@ -20,7 +20,7 @@ class MarketSession {
         $this->context = new RequestContext();
         $this->context->setUnknown1(0);
         $this->context->setVersion(1002012);
-        $this->context->setDeviceAndSdkVersion("sapphire:7");
+        $this->context->setDeviceAndSdkVersion(MARKET_DEVICE_AND_SDK_VERSION);
 
         $this->context->setUserLanguage("en");
         $this->context->setUserCountry("US");
@@ -93,7 +93,7 @@ class MarketSession {
 
 
         $headers = array(
-            "User-Agent: Android-Market/2 (sapphire PLAT-RC33); gzip",
+            "User-Agent: ".MARKET_USER_AGENT,
             "Content-Type: application/x-www-form-urlencoded",
             "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7",
         );
@@ -196,7 +196,7 @@ class MarketSession {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_COOKIE, "ANDROID=" . $this->authSubToken);
-        curl_setopt($ch, CURLOPT_USERAGENT, "Android-Market/2 (sapphire PLAT-RC33); gzip");
+        curl_setopt($ch, CURLOPT_USERAGENT, MARKET_USER_AGENT);
 
         $post = "version=2&request=" . base64_encode($request);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
