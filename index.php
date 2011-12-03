@@ -56,6 +56,9 @@ if (empty($myPackageNameStr)) {
     . '-perms [permission string CSV (optional)]' . $myNewLineChar;
     echo 'notes: please fill out as many fields as possible. '
     . $myNewLineChar;
+    echo 'For the paranoid, be sure to take a second look at any scores of 2+. '
+    . 'For normal users, any applications with a score of 5+ might be worth the second look. '
+    . 'Bad things WILL happen with a score of 7+. ' . $myNewLineChar;
     die();
 }
 
@@ -94,7 +97,9 @@ foreach ($myPermArray as $aPerm) {
     }
     $myDangerScore += $aRetValue;
 }
-$myDangerScore = $myDangerScore / $aPermCounted;
+if ($aPermCounted > 0) { //prevent divide by zero
+    $myDangerScore = $myDangerScore / $aPermCounted;
+}
 if ($myDangerScore > 9) {
     $myDangerScore = 9;
 } elseif ($myDangerScore < 0) {
