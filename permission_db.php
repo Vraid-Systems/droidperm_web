@@ -1,6 +1,10 @@
 <?php
 
 /**
+ * VULNERABLE TO SQL INJECTIONS
+ * thought you should know that this is not production quality code
+ *
+ *
  * SQLite3 database and table setup
  * NOTE: be sure to create the db directory with 777 perms on the server
  */
@@ -25,9 +29,37 @@ $SQLite3_conn->exec($aSqlCreatePermsWatchTable);
 
 /**
  * initialize watched permissions
+ * scores are set based on need to 1) mitigate larger group damage, 2) minimze
+ * privacy violations, 3) stop property damage
+ *
+ * Paranoid - 2
+ * Normal - 5
+ * Lax - 7
  */
-p_setWatchedPermissionValue("android.permission.ACCESS_FINE_LOCATION", 1.25);
-p_setWatchedPermissionValue("android.permission.WRITE_SMS", 3.5);
+p_setWatchedPermissionValue("android.permission.ACCESS_COARSE_LOCATION", 1.00);
+p_setWatchedPermissionValue("android.permission.ACCESS_FINE_LOCATION", 2.75);
+p_setWatchedPermissionValue("android.permission.BLUETOOTH_ADMIN", 1.50);
+p_setWatchedPermissionValue("android.permission.BRICK", 9.00);
+p_setWatchedPermissionValue("android.permission.CALL_PHONE", 3.00);
+p_setWatchedPermissionValue("android.permission.CALL_PRIVILEGED", 9.00);
+p_setWatchedPermissionValue("android.permission.DEVICE_POWER", 1.50);
+p_setWatchedPermissionValue("android.permission.INSTALL_PACKAGES", 4.25);
+p_setWatchedPermissionValue("android.permission.MODIFY_PHONE_STATE", 0.25);
+p_setWatchedPermissionValue("android.permission.NFC", 0.75);
+p_setWatchedPermissionValue("android.permission.READ_CALENDAR", 1.25);
+p_setWatchedPermissionValue("android.permission.READ_CONTACTS", 3.25);
+p_setWatchedPermissionValue("android.permission.READ_HISTORY_BOOKMARKS", 0.50);
+p_setWatchedPermissionValue("android.permission.READ_OWNER_DATA", 5.50);
+p_setWatchedPermissionValue("android.permission.READ_PROFILE", 4.25);
+p_setWatchedPermissionValue("android.permission.READ_SMS", 6.25);
+p_setWatchedPermissionValue("android.permission.REBOOT", 7.00);
+p_setWatchedPermissionValue("android.permission.RECEIVE_BOOT_COMPLETED", 0.25);
+p_setWatchedPermissionValue("android.permission.RECEIVE_MMS", 4.00);
+p_setWatchedPermissionValue("android.permission.RECEIVE_SMS", 5.00);
+p_setWatchedPermissionValue("android.permission.SEND_SMS", 4.00);
+p_setWatchedPermissionValue("android.permission.USE_SIP", 5.25);
+p_setWatchedPermissionValue("android.permission.UPDATE_DEVICE_STATS", 8.25);
+p_setWatchedPermissionValue("android.permission.WRITE_SETTINGS", 6.50); //and read
 
 /**
  * set the current score (and start score if new) for a permission string

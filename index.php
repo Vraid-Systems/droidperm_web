@@ -4,9 +4,9 @@ $myCarriageReturnChar = "\r";
 $myNewLineChar = "\n";
 
 #get the package we are going to be searching for
-$myPackageNameSearch = false;
+$myPackageNameStr = false;
 if (isset($_GET['package']) && ($_GET['package'] != '')) {
-    $myPackageNameSearch = $_GET['package'];
+    $myPackageNameStr = $_GET['package'];
 }
 
 #get category of app
@@ -27,8 +27,8 @@ while (count($argv) > 0) {
     switch ($arg) {
         case '-package':
             $arg_package = array_shift($argv);
-            if (empty($myPackageNameSearch)) {
-                $myPackageNameSearch = $arg_package;
+            if (empty($myPackageNameStr)) {
+                $myPackageNameStr = $arg_package;
             }
             break;
         case '-category':
@@ -47,7 +47,7 @@ while (count($argv) > 0) {
 }
 
 #check to make sure we have the params we need
-if (empty($myPackageNameSearch)) {
+if (empty($myPackageNameStr)) {
     echo 'web usage: ?package=[com.namespace.title]&category='
     . '[Music & Audio|Tools|Cards & Casino|etc (optional)]&perms=[CSV like - '
     . 'android.permission.GET_ACCOUNTS,android.permission.INTERNET (optional)]'
@@ -64,74 +64,15 @@ include("permission_db.php");
 
 #check if package is already in db for local retrieval of perm data
 if (empty($myPermCSV) || empty($myCategoryStr)) {
-    $myCategoryStr = p_getPackageCategory($myPackageNameSearch);
-    $aPermCSV = p_getPackagePermissions($myPackageNameSearch, $myCategoryStr);
+    $myCategoryStr = p_getPackageCategory($myPackageNameStr);
+    $aPermCSV = p_getPackagePermissions($myPackageNameStr, $myCategoryStr);
     if ($aPermCSV && !empty($myCategoryStr)) { //already have perm CSV from DB
         $myPermCSV = $aPermCSV;
     } else { //need to grab perm data from market
-        #php market api - includes must be in this order, especially middle two
-        include("MarketSession_config.php");
-        include("proto/protocolbuffers.inc.php");
-        include("proto/market.proto.php");
-        include("MarketSession.php");
-
-        # create session, and auth with google servers --> auth token
-        $session = new MarketSession();
-        $session->login(GOOGLE_EMAIL, GOOGLE_PASSWD);
-        $session->setAndroidId(ANDROID_DEVICEID);
-
-        #the search loop
-        $myEntriesFetchCount = 10;
-        $myPackageTotalCount = 0; //number of apps had to search through
-        $mySearchLoopCountLimit = 10;
-        $mySearchLoopCount = 0;
-        while (empty($myPermCSV) && empty($myCategoryStr)) {
-            #create market search request
-            $ar = new AppsRequest();
-            $ar->setQuery($myPackageNameSearch);
-            $ar->setOrderType(AppsRequest_OrderType::NEWEST);
-            $ar->setStartIndex(($mySearchLoopCount * $myEntriesFetchCount));
-            $ar->setEntriesCount($myEntriesFetchCount);
-            $ar->setWithExtendedInfo(true);
-
-            $reqGroup = new Request_RequestGroup();
-            $reqGroup->setAppsRequest($ar);
-
-            #query the Android market servers using request and auth token
-            $response = $session->execute($reqGroup);
-
-            #get the response
-            $groups = $response->getResponsegroupArray();
-
-            #grab the first matching package
-            foreach ($groups as $rg) {
-                if (!empty($myPermCSV) && !empty($myCategoryStr))
-                    break; //do not overwrite old values
-                $appsResponse = $rg->getAppsResponse();
-                $apps = $appsResponse->getAppArray();
-                foreach ($apps as $app) {
-                    if (!empty($myPermCSV) && !empty($myCategoryStr))
-                        break; //do not overwrite old values
-                    $myPackageTotalCount++;
-                    $aPackageName = $app->getPackageName();
-                    if ($myPackageNameSearch == $aPackageName) { //if there is a match ... grab first
-                        if (empty($myCategoryStr)) {
-                            $myCategoryStr = $app->getExtendedInfo()->getCategory();
-                        }
-                        if (empty($myPermCSV)) {
-                            $aPermArray = $app->getExtendedInfo()->getPermissionIdArray();
-                            $myPermCSV = implode(",", $aPermArray);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            $mySearchLoopCount++;
-
-            if ($mySearchLoopCount >= $mySearchLoopCountLimit)
-                break;
-        }
+        include("search.php");
+        $aDataArray = getPermsAndCategory($myPackageNameStr, $myCategoryStr, $myPermCSV);
+        $myCategoryStr = $aDataArray[1];
+        $myPermCSV = $aDataArray[2];
     }
 } else { //preprocess user input for extra leading/trailing commas/spaces
     $myPermCSV = trim($myPermCSV, " ,");
@@ -139,25 +80,36 @@ if (empty($myPermCSV) || empty($myCategoryStr)) {
 
 #store complete response data for later if not already in DB
 if (!empty($myPermCSV) && !empty($myCategoryStr)) {
-    p_setPackage($myPackageNameSearch, $myCategoryStr, $myPermCSV);
+    p_setPackage($myPackageNameStr, $myCategoryStr, $myPermCSV);
 }
 
-#score permissions of app - TODO: add category considerations
+#score permissions of app
 $myDangerScore = 0;
 $myPermArray = explode(",", $myPermCSV);
+$aPermCounted = 0;
 foreach ($myPermArray as $aPerm) {
-    $myDangerScore += p_getWatchedPermissionValue($aPerm);
+    $aRetValue = p_getWatchedPermissionValue($aPerm);
+    if ($aRetValue > 0) {
+        $aPermCounted++;
+    }
+    $myDangerScore += $aRetValue;
 }
+$myDangerScore = $myDangerScore / $aPermCounted;
 if ($myDangerScore > 9) {
     $myDangerScore = 9;
 } elseif ($myDangerScore < 0) {
     $myDangerScore = 0;
 }
+if ((($myCategoryStr == 'Books & Reference') && ($myDangerScore > 2))
+        || (($myCategoryStr == 'Business') && ($myDangerScore > 5))
+        || (($myCategoryStr == 'Comics') && ($myDangerScore > 4))) {
+    $myDangerScore++;
+}
 
 #output the response
-echo 'name=' . $myPackageNameSearch . $myNewLineChar;
+echo 'name=' . $myPackageNameStr . $myNewLineChar;
 echo 'category=' . $myCategoryStr . $myNewLineChar;
 echo 'perms=' . $myPermCSV . $myNewLineChar;
-echo 'danger_level=' . $myDangerScore . $myNewLineChar;
+echo 'danger_level=' . round($myDangerScore, 2) . $myNewLineChar;
 echo 'danger_about=' . $myNewLineChar;
 ?>
