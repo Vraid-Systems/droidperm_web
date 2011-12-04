@@ -7,6 +7,8 @@ $myNewLineChar = "\n";
 $myPackageNameStr = false;
 if (isset($_GET['package']) && ($_GET['package'] != '')) {
     $myPackageNameStr = $_GET['package'];
+} elseif (isset($_POST['package']) && ($_POST['package'] != '')) {
+    $myPackageNameStr = $_POST['package'];
 }
 
 #get category of app
@@ -65,56 +67,67 @@ if (empty($myPackageNameStr)) {
 #include necessary for queries against local sqlite3 db
 include("permission_db.php");
 
-#check if package is already in db for local retrieval of perm data
-if (empty($myPermCSV) || empty($myCategoryStr)) {
-    $myCategoryStr = p_getPackageCategory($myPackageNameStr);
-    $aPermCSV = p_getPackagePermissions($myPackageNameStr, $myCategoryStr);
-    if ($aPermCSV && !empty($myCategoryStr)) { //already have perm CSV from DB
-        $myPermCSV = $aPermCSV;
-    } else { //need to grab perm data from market
-        include("search.php");
-        $aDataArray = getPermsAndCategory($myPackageNameStr, $myCategoryStr, $myPermCSV);
-        $myCategoryStr = $aDataArray[1];
-        $myPermCSV = $aDataArray[2];
+#what is happening?
+if ((isset($_POST['interface_id']) && ($_POST['interface_id'] != ''))
+        || (isset($_POST['installed']) && ($_POST['installed'] != ''))) { //install feedback
+    if (isset($_POST['interface_id']) && isset($_POST['installed'])) {
+        $aInterfaceId = $_POST['interface_id'];
+        $aInstalledFlag = $_POST['installed'];
+        if (($aInterfaceId != '') && ($aInstalledFlag != '')) {
+            p_incrementInstallCount($aInterfaceId, $myPackageNameStr, $aInstalledFlag);
+        }
     }
-} else { //preprocess user input for extra leading/trailing commas/spaces
-    $myPermCSV = trim($myPermCSV, " ,");
-}
-
-#store complete response data for later if not already in DB
-if (!empty($myPermCSV) && !empty($myCategoryStr)) {
-    p_setPackage($myPackageNameStr, $myCategoryStr, $myPermCSV);
-}
-
-#score permissions of app
-$myDangerScore = 0;
-$myPermArray = explode(",", $myPermCSV);
-$aPermCounted = 0;
-foreach ($myPermArray as $aPerm) {
-    $aRetValue = p_getWatchedPermissionValue($aPerm);
-    if ($aRetValue > 0) {
-        $aPermCounted++;
+} else { //default to permission scoring
+    #check if package is already in db for local retrieval of perm data
+    if (empty($myPermCSV)) {
+        $aPermCSV = p_getPackagePermissions($myPackageNameStr);
+        if ($aPermCSV) { //already have perm CSV from DB
+            $myPermCSV = $aPermCSV;
+        } else { //need to grab perm data from market
+            include("search.php");
+            $aDataArray = getPermsAndCategory($myPackageNameStr, $myCategoryStr, $myPermCSV);
+            $myCategoryStr = $aDataArray[1];
+            $myPermCSV = $aDataArray[2];
+        }
+    } else { //preprocess user input for extra leading/trailing commas/spaces
+        $myPermCSV = trim($myPermCSV, " ,");
     }
-    $myDangerScore += $aRetValue;
-}
-if ($aPermCounted > 0) { //prevent divide by zero
-    $myDangerScore = $myDangerScore / $aPermCounted;
-}
-if ($myDangerScore > 9) {
-    $myDangerScore = 9;
-} elseif ($myDangerScore < 0) {
+
+    #store complete response data for later if not already in DB
+    if (!empty($myPermCSV)) {
+        p_setPackage($myPackageNameStr, $myPermCSV);
+    }
+
+    #score permissions of app
     $myDangerScore = 0;
-}
-if ((($myCategoryStr == 'Books & Reference') && ($myDangerScore > 2))
-        || (($myCategoryStr == 'Business') && ($myDangerScore > 5))
-        || (($myCategoryStr == 'Comics') && ($myDangerScore > 4))) {
-    $myDangerScore++;
-}
+    $myPermArray = explode(",", $myPermCSV);
+    $aPermCounted = 0;
+    foreach ($myPermArray as $aPerm) {
+        $aRetValue = p_getWatchedPermissionValue($aPerm);
+        if ($aRetValue > 0) {
+            $aPermCounted++;
+        }
+        $myDangerScore += $aRetValue;
+    }
+    if ($aPermCounted > 0) { //prevent divide by zero
+        $myDangerScore = $myDangerScore / $aPermCounted;
+    }
+    if ($myDangerScore > 9) {
+        $myDangerScore = 9;
+    } elseif ($myDangerScore < 0) {
+        $myDangerScore = 0;
+    }
+    if ((($myCategoryStr == 'Books & Reference') && ($myDangerScore > 2))
+            || (($myCategoryStr == 'Business') && ($myDangerScore > 5))
+            || (($myCategoryStr == 'Comics') && ($myDangerScore > 4))) {
+        $myDangerScore++;
+    }
 
-#output the response
-echo 'name=' . $myPackageNameStr . $myNewLineChar;
-echo 'category=' . $myCategoryStr . $myNewLineChar;
-echo 'perms=' . $myPermCSV . $myNewLineChar;
-echo 'danger_level=' . round($myDangerScore, 2) . $myNewLineChar;
-echo 'danger_about=' . $myNewLineChar;
+    #output the response
+    echo 'name=' . $myPackageNameStr . $myNewLineChar;
+    echo 'category=' . $myCategoryStr . $myNewLineChar;
+    echo 'perms=' . $myPermCSV . $myNewLineChar;
+    echo 'danger_level=' . round($myDangerScore, 2) . $myNewLineChar;
+    echo 'danger_about=' . $myNewLineChar;
+}
 ?>

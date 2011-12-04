@@ -12,14 +12,13 @@ $SQLite3_conn = new SQLite3('db/MarketPerms.db');
 $SQLite3_conn->exec("PRAGMA foreign_keys = ON");
 
 $aSqlCreatePackagesTable = "CREATE TABLE IF NOT EXISTS Packages "
-        . "(id INTEGER PRIMARY KEY DESC, name TEXT, "
-        . "category TEXT, permissions TEXT)";
+        . "(id INTEGER PRIMARY KEY ASC, name TEXT, permissions TEXT)";
 $SQLite3_conn->exec($aSqlCreatePackagesTable);
 
 $aSqlCreateInstallsTable = "CREATE TABLE IF NOT EXISTS Installs "
-        . "(id INTEGER PRIMARY KEY DESC, completed INTEGER, "
-        . "packages_id INTEGER, "
-        . "FOREIGN KEY(packages_id) REFERENCES Packages(id))";
+        . "(id INTEGER PRIMARY KEY ASC, completed INTEGER, "
+        . "interface_id TEXT, package_id INTEGER, "
+        . "FOREIGN KEY(package_id) REFERENCES Packages(id))";
 $SQLite3_conn->exec($aSqlCreateInstallsTable);
 
 $aSqlCreatePermsWatchTable = "CREATE TABLE IF NOT EXISTS PermWatch "
@@ -102,88 +101,69 @@ function p_getWatchedPermissionValue($thePermStr) {
 }
 
 /**
- * update the install table to include a completed tuple for the given package
+ * add a tuple to the Installs table for the given interface_id and package_id
  *
  * @global SQLite3 $SQLite3_conn
- * @param string $theName
- * @param string $theCategory
+ * @param string $theInterfaceId
+ * @param string $theName - the package name [com.whatever]
+ * @param integer $theInstalledFlag [0|1]
  */
-function p_incrementCompletedInstallCount($theName, $theCategory) {
+function p_incrementInstallCount($theInterfaceId, $theName, $theInstalledFlag) {
     global $SQLite3_conn;
-    $aPid = $SQLite3_conn->querySingle("SELECT Packages.id FROM Installs, "
-            . "Packages WHERE Installs.packages_id = Packages.id AND "
-            . "Packages.name='$theName' AND Packages.category='$theCategory'");
-    $SQLite3_conn->exec("INSERT INTO Installs VALUES(NULL, 1, '$aPid')");
+    $aPid = $SQLite3_conn->querySingle("SELECT id FROM Packages WHERE name='$theName'");
+    if (is_int($aPid) && (($theInstalledFlag == 0) || ($theInstalledFlag == 1))) {
+        $SQLite3_conn->exec("INSERT INTO Installs VALUES(NULL, $theInstalledFlag, '$theInterfaceId', $aPid)");
+    }
 }
 
 /**
- * update the install table to include a rejected tuple for the given package
- *
- * @global SQLite3 $SQLite3_conn
- * @param string $theName
- * @param string $theCategory
- */
-function p_incrementRejectedInstallCount($theName, $theCategory) {
-    global $SQLite3_conn;
-    $aPid = $SQLite3_conn->querySingle("SELECT Packages.id FROM Installs, "
-            . "Packages WHERE Installs.packages_id = Packages.id AND "
-            . "Packages.name='$theName' AND Packages.category='$theCategory'");
-    $SQLite3_conn->exec("INSERT INTO Installs VALUES(NULL, 0, '$aPid')");
-}
-
-/**
- * how many times was a certain package name in a certain category still
+ * how many times was a certain package name still
  * installed by the user after seeing our information screen?
  *
  * @global SQLite3 $SQLite3_conn
  * @param string $theName
- * @param string $theCategory
  * @return integer - count of package installed after seeing our screen?
  */
-function p_getCompletedInstallCount($theName, $theCategory) {
+function p_getCompletedInstallCount($theName) {
     global $SQLite3_conn;
     $aCompletedInstallCount = $SQLite3_conn->querySingle("SELECT COUNT(*) FROM "
-            . "Installs, Packages WHERE Installs.packages_id = Packages.id AND "
-            . "Packages.name='$theName' AND Packages.category='$theCategory' "
-            . "AND Installs.completed = 1");
+            . "Installs, Packages WHERE Installs.package_id = Packages.id AND "
+            . "Packages.name='$theName' AND Installs.completed = 1");
     return $aCompletedInstallCount;
 }
 
 /**
- * how many times was a certain package name in a certain category rejected
+ * how many times was a certain package name rejected
  * by the user after seeing our information screen?
  *
  * @global SQLite3 $SQLite3_conn
  * @param string $theName
- * @param string $theCategory
  * @return integer - count of package rejected after seeing our screen?
  */
-function p_getRejectedInstallCount($theName, $theCategory) {
+function p_getRejectedInstallCount($theName) {
     global $SQLite3_conn;
     $aRejectedInstallCount = $SQLite3_conn->querySingle("SELECT COUNT(*) FROM "
-            . "Installs, Packages WHERE Installs.packages_id = Packages.id AND "
-            . "Packages.name='$theName' AND Packages.category='$theCategory' "
-            . "AND Installs.completed = 0");
+            . "Installs, Packages WHERE Installs.package_id = Packages.id AND "
+            . "Packages.name='$theName' AND Installs.completed = 0");
     return $aRejectedInstallCount;
 }
 
 /**
- * create a package in the database if one with the same name and category
- * do not already exist
+ * create a package in the database if one with the same name
+ * does not already exist
  *
  * @global SQLite3 $SQLite3_conn
  * @param string $theName
- * @param string $theCategory
  * @param string $thePermissionCSV
  * @return boolean - was a package record created?
  */
-function p_setPackage($theName, $theCategory, $thePermissionCSV) {
+function p_setPackage($theName, $thePermissionCSV) {
     global $SQLite3_conn;
     $aResultCount = $SQLite3_conn->querySingle("SELECT COUNT(*) FROM Packages "
-            . "WHERE name='$theName' AND category='$theCategory'");
+            . "WHERE name='$theName'");
     if ($aResultCount == 0) {
         $SQLite3_conn->exec("INSERT INTO Packages VALUES(NULL, '$theName', "
-                . "'$theCategory', '$thePermissionCSV')");
+                . "'$thePermissionCSV')");
         return true;
     } else {
         return false;
@@ -196,41 +176,18 @@ function p_setPackage($theName, $theCategory, $thePermissionCSV) {
  *
  * @global SQLite3 $SQLite3_conn
  * @param string $theName
- * @param string $theCategory
  * @return boolean or CSV
  */
-function p_getPackagePermissions($theName, $theCategory) {
-    global $SQLite3_conn;
-    $aResultCount = $SQLite3_conn->querySingle("SELECT COUNT(*) FROM Packages "
-            . "WHERE name='$theName' AND category='$theCategory'");
-    if ($aResultCount == 1) {
-        $results = $SQLite3_conn->query("SELECT permissions FROM Packages "
-                . "WHERE name='$theName' AND category='$theCategory'");
-
-        $row = $results->fetchArray(SQLITE3_ASSOC);
-        return $row['permissions'];
-    } else {
-        return false;
-    }
-}
-
-/**
- * grab the first non-empty category string for a certain package name
- *
- * @global SQLite3 $SQLite3_conn
- * @param string $theName
- * @return string
- */
-function p_getPackageCategory($theName) {
+function p_getPackagePermissions($theName) {
     global $SQLite3_conn;
     $aResultCount = $SQLite3_conn->querySingle("SELECT COUNT(*) FROM Packages "
             . "WHERE name='$theName'");
-    if ($aResultCount <= 2) {
-        $results = $SQLite3_conn->query("SELECT category FROM Packages "
-                . "WHERE name='$theName' AND category<>''");
+    if ($aResultCount == 1) {
+        $results = $SQLite3_conn->query("SELECT permissions FROM Packages "
+                . "WHERE name='$theName'");
 
         $row = $results->fetchArray(SQLITE3_ASSOC);
-        return $row['category'];
+        return $row['permissions'];
     } else {
         return false;
     }
